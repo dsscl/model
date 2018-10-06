@@ -1,0 +1,230 @@
+<pre>
+    &15、装饰着模式
+    ~开发程序中，我们一般不希望某个类天生就非常庞大，一次性包含许多职责。那么就可以用装饰者模式。装饰者模式可以动态地给
+某个对象添加一些额外的职责，而不会影响从这个类中派生的其他对象。
+    ~在传统的面向对象编程语言中，给对象添加功能常常使用继承的方式，但是继承的方式并不灵活，还会带来许多问题：
+一方面会导致超类和子类之间存在强耦合，当超类改变时，子类也会随之改变，另一方面，继承这种复用方式通常被称为“白箱复用”，
+“白箱”是相对可见的性而言的，在继承方式中，超类的内部细节是对子类可见的，继承常常被认为破坏了封装性。
+    ~另一个问题，在完成一些功能复用的同时，有可能创建出大量的子类，使子类的数量呈爆炸性增长。比如现在有4种型号的自行车，
+我们为每种自行车都定义了一个单独的类。现在要给每种自行车都装上前灯、尾灯和铃铛着3种配件。如果使用继承的方式来给每种
+自行车创建子类，则需要4*3=12个子类。但是如果把前灯、尾灯、铃铛这些对象动态组合到自行车上面，则只需要额外增加3个类。
+    ~这种给对象动态地增加职责的方式称为装饰者模式。装饰者模式能够在不改变对象自身的基础上，在程序运行期间给对象动态地
+添加职责。跟继承相比，装饰者是一种更轻便灵活的做法，这是一种“即用即付”的方式，比如天冷了就多穿一件外套，需要飞行时就在
+头上插一支竹蜻蜓，遇到一堆食尸鬼时就点开AOE（范围攻击）技能。
+
+一、模拟传统面向对象语言的装饰者模式
+    ~首先要提出来的是，作为一门解释执行的语言，给js中的对象动态添加或者改变职责是一件再简单不过的事情，虽然这种做法改动了对象
+自身，跟传统定义中的装饰者模式并不一样，但这无疑更符合js的语言特色:
+var obj = {
+    name: 'sven',
+    address: '深圳市'
+}
+obj.address = obj.address + '福田区'
+    ~传统面向对象语言中的装饰者模式在js中适用的场景并不多，如上面的代码所示，通常我们并不太介意改动对象自身。
+尽管如此，本节我们还是稍微模拟一下传统面向对象语言中的装饰者模式的实现。
+    ~假设我们在编写一个飞机大战的游戏，随着经验值的增加，我们操作的飞机对象可以升级称为更厉害的飞机，一开始这些飞机
+只能发射普通的子弹，升级到二级时可以发射导弹，升到三级时可以发射原子弹：
+<!-- 首先是飞机类 -->
+var Plane = function() {}
+Plane.prototype.fire = function() {
+    log('发射普通子弹')
+}
+<!-- 接下来增加两个装饰类，分别是导弹和原子弹 -->
+var MissileDecoration = function(plane) {
+    this.plane = plane
+}
+MissileDecoration.prototype.fire = function() {
+    this.plane.fire()
+    log('发射导弹')
+}
+var AtomDecoration = function(plane) {
+    this.plane = plane
+}
+AtomDecoration.prototype.fire = function() {
+    this.plane.fire()
+    log('发射原子弹')
+}
+    ~导弹类和原子弹类的构造函数都接收参数plane对象，并且保存好这个参数，在它们的fire方法中，除了执行自身的操作之外，
+还调用了plane对象的fire方法。
+    ~这种给对象动态增加职责的方式，并没有真正地改动对象自身，而是将对象放入另一个对象之中，这些对象以一条链的方式进行
+引用，形成一个聚合对象。这些对象都拥有相同的接口（fire方法），当请求达到链中的某个对象时，这个对象会执行自身的操作，
+随后把请求转发给链中的下一个对象。
+    ~因为装饰者对象和它所装饰的对象拥有一致的接口，所以它们对使用该对象的客户来说时透明的，被装饰的对象也许并不
+需要了解它曾经被装饰过，这种透明性使得我们可以递归地嵌套任意多个装饰者对象。如图：
+AtomDecoration
+fire  ------------>   MissileDecoration
+                      fire  -----------------> Plane
+                                               fire
+测试结果：
+var plane = new Plane()
+plane = new MissileDecoration(plane)
+plane = new AtomDecoration(plane)
+plane.fire()  // 分别输出：发射普通子弹，发射导弹，发射原子弹
+
+二、装饰者也是包装器
+~在《设计模式》成书之前，GoF原想把装饰者（decoration）模式称为包装器（wrapper）模式。
+~从功能上而言，decoration能很好的描述这个模式，但从结构上看，wrapper的说法更加贴切。装饰者模式将一个对象嵌入另一个对象
+之中，实际上相当于这个对象被另一个对象包装起来，形成一条包装链。请求随着这条链条依次传递到所有的对象，每个对象都有处理
+这条请求的机会。
+
+三、回到JavaScript的装饰者
+~js语言动态改变对象相当容易，我们可以直接改写对象或者对象的某个方法，并不需要使用“类”来实现装饰者模式：
+var plane = {
+    fire: function() {
+        log('普通子弹')
+    }
+}
+var missileDecoration = function() {
+    log('导弹')
+}
+var atomDecoration = function() {
+    log('原子弹')
+}
+
+var fire1 = plane.fire
+plane.fire = function() {
+    fire1()
+    missileDecoratioin()
+}
+var fire2 = plane.fire
+plane.fire = function() {
+    fire2()
+    atomDecoratioin()
+}
+
+plane.fire() // 普通子弹、导弹、原子弹
+
+四、装饰函数
+~在js中，几乎一切都是对象，其中函数又被称为一等对象。在平时的开发工作中，也许大部分时间都在和函数打交道。在js中可以很
+方便地给某个对象扩展属性和方法，但却很难在不改变函数源代码的情况下，给该函数添加一些额外的功能。在代码运行期间，我们
+很难切入某个函数的执行环境。
+~要想为函数添加一些功能，最简单粗暴的方法就是直接改写该函数，但这是最差的办法，直接违反了开放-封闭原则：
+var a = function() {
+    alert(1)
+}
+// 改成：
+var a = function() {
+    alert(1)
+    alert(2)
+}
+~很多时候我们不想去碰原函数，也许原函数是由其他同事编写的，里面的实现非常杂乱。甚至在一个古老的项目中，这个函数的
+源代码被隐藏在一个我们不愿碰触的阴影角落里。现在需要一个办法，在不改变原函数的情况下，能给函数增加功能，这正是开发
+-封闭原则给我们指出的光明道路。
+<!-- 之前我们已经找了一种答案，通过保存原引用的方式就可以改写某个函数 -->
+var a = function() {
+    alert(1)
+}
+var _a = a
+a = function() {
+    _a()
+    alert(2)
+}
+a()
+~这是实际开发中很常见的一种做法，比如我们想给window绑定onload事件，但是又不确定这个事件是不是已经被其他人绑定过，
+为了避免覆盖掉之前的window.onload函数中的行为，我们一般都会先保存好原先的window.onload，把它放入新的window.onload
+里执行：
+window.onload = function() {
+    alert(1)
+}
+var _onload = window.onload || function() {}
+window.onload = function() {
+    _onload()
+    alert(2)
+}
+~这样的代码时符合开放-封闭原则的，我们在增加新功能的时候，确实没有修改原来的window.onload代码，但是也存在两个问题：
+1）必须维护_onload这个中间变量，虽然看起来不起眼，但如果函数的装饰链较长，或者需要装饰的函数变多，这些中间变量的数量
+也会越来越多。
+2）其实还遇到了this被劫持的问题，在window.onload的例子中并没有这个烦恼，是因为调用普通函数_onload时，this也指向
+window，跟调用window.onload时一样（函数作为对象的方法被调用时，this指向该对象）。现在把window.onload换成document.
+getElementById:
+var _getElementById = document.getElementById
+
+document.getElementById = function(id) {
+    alert(1)
+    return _getElementById(id)    // (1)
+}
+
+var button = document.getElementById('button')
+执行这段代码，我们看到在弹出alert(1)之后，紧接着控制台抛出了异常：
+// 输出：Uncaught TypeError: Illegal invocation
+异常发生在（1)处的_getElementById(id)这句代码上，此时_getElementById是一个全局函数，当调用一个全局函数时，this
+是指向window的，而document.getElementById方法的内部实现需要使用this引用，this在这个方法内预期是指向document,
+而不是window，这是错误发生的原因。所以使用现在的方式给函数增加功能并不保险。
+~改进后的代码可以满足需求，我们要手动把document当作上下文this传入_getElementById:
+var _getElementById = document.getElementById
+
+document.getElementById = function() {
+    alert(1)
+    return _getElementById.apply(document, arguments)
+}
+
+var button = document.getElementById('button')
+~但这样做显然不方便，下面我们引入之前提及的AOP，来提供一种完美的方法给函数动态增加功能。
+
+五、用AOP装饰函数
+~首先给出Function.prototype.before方法和Function.prototype.after方法：
+Function.prototype.before = function(beforefn) {
+    var _self = this  // 保存原函数的引用
+    return function() {  // 返回包含了原函数和新函数的“代理”函数
+        beforefn.apply(this, arguments)  // 执行新函数，且保证this不被劫持，新函数接受的参数也会被原封不动的传入原函数，新函数在原函数之前执行
+        return _self.apply(this, arguments)  // 执行原函数并返回原函数的执行结果，并且保证this不被劫持
+    }
+}
+Function.prototype.after = function(afterfn) {
+    var _self = this
+    return function() {
+        var ret = _self.apply(this, arguments)
+        afterfn.apply(this, arguments)
+        return ret
+    }
+}
+~Funciton.prototype.before接受一个函数当作参数，这个函数即为新添加的函数，它装载了新添加的功能代码。
+~接下来把当前的this保存起来，这个this指向原函数，然后返回一个“代理”函数，这个“代理”函数只是结构上像代理而已，
+并不承担代理的职责（比如控制对象的访问等）。它的工作是把请求分别转发给新添加的函数和原函数，且负责保证它们的执行
+顺序，让新添加的函数在原函数之前执行（前置装饰），这样就实现了动态装饰的效果。
+~我们注意到，通过Function.prototype.apply来动态传入正确的this，保证了函数在被装饰之后，this不会被劫持。
+~Function.prototype.after的原理跟Function.prototype.before一模一样，唯一不同的地方在于让新添加的函数在原函数
+之后再执行。
+~下面试试用Function.prototype.before的威力：
+Function.prototype.before(beforefn) {
+    var _self = this
+    return function() {
+        beforefn.apply(this, arguments)
+        return _self.apply(this, arguments)
+    }
+}
+document.getElementById = document.getElementById.before(funciton() {
+    alert(1)
+})
+var button = document.getElementById('button')
+console.log(button)
+~再回到window.onload的例子：
+window.onload = function() {
+    alert(1)
+}
+window.onload = (window.onload || function() {}).after(function() {
+    alert(2)
+}).after(function() {
+    alert(3)
+}).after(function() {
+    alert(4)
+})
+~值得提到的是，上面的AOP实现是在Function.prototype上添加before和after方法，但也许很多人不喜欢这种污染原型的方式，
+那么我们可以做一些变通，把原函数和新函数都作为参数传入before或者after方法：
+var before = function(fn, beforefn) {
+    return function() {
+        beforefn.apply(this, arguments)
+        return fn.apply(this, arguments)
+    }
+}
+
+var a = before(
+    function() { alert(3) },
+    function() { alert(2) }
+)
+
+a = before(a, function() { alert(1) })
+a()
+
+六、AOP的应用实例
+</pre>
